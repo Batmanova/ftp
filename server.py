@@ -1,5 +1,6 @@
 import socket
 import os
+import threading
 
 def rmdir(path):
     if os.listdir(path) == []:
@@ -50,24 +51,26 @@ def process(req):
         except OSError:
             return 'error'
     elif req.startswith('GET /delete/'):
-        name = req.split()[1][7:]
+        name = req.split()[1][8:]
         try:
             os.remove(homedir + name)
             with open('/home/alisa/PycharmProjects/ftp/log.txt', 'w') as logs:
                 logs.write('delete ' + name + ' ' + user)
             return 'deleted'
-        except OSError:
+        except OSError as e:
+            print(e)
             return 'error'
     elif req.startswith('GET /rename/'):
         data = req.split()[1][7:]
-        prev = data.split('/')[0].replace('\\', '/')
-        now = data.split('/')[1].replace('\\', '/')
+        prev = data.split('/')[1].replace('\\', '/')
+        now = data.split('/')[2].replace('\\', '/')
         try:
             os.rename(homedir + prev, homedir + now)
             with open('/home/alisa/PycharmProjects/ftp/log.txt', 'w') as logs:
                 logs.write('rename ' + prev + ' ' + now + ' ' + user)
             return 'renamed'
-        except OSError:
+        except OSError as e:
+            print(e)
             return 'error'
     elif req.startswith('GET /receive/'):
         data = req.split()[1][9:]
@@ -80,11 +83,21 @@ def process(req):
             print(e)
             return 'error'
     elif req.startswith('GET /stop/'):
-        conn.close()
+        return 'close connection'
     else:
         return 'bad request'
 
-PORT = 9092
+def user(conn, addr):
+    while True:
+        request = conn.recv(1024).decode()
+        print(request)
+        response = process(request)
+        conn.send(response.encode())
+        if request.startswith('GET /stop/'):
+            conn.close()
+            break
+
+PORT = 8090
 users = ['alisa']
 sock = socket.socket()
 sock.bind(('', PORT))
@@ -94,9 +107,6 @@ while True:
     print("Слушаем порт", PORT)
     conn, addr = sock.accept()
     print(addr)
-
-    request = conn.recv(1024).decode()
-    print(request)
-
-    response = process(request)
-    conn.send(response.encode())
+    t = threading.Thread(target=user, args=(conn, addr))
+    t.daemon = True
+    t.start()
