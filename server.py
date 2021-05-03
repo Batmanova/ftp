@@ -75,10 +75,15 @@ def process(req):
     elif req.startswith('GET /receive/'):
         data = req.split()[1][9:]
         try:
-            with open(homedir+data, 'r') as file:
-                with open('/home/alisa/PycharmProjects/ftp/log.txt', 'w') as logs:
-                    logs.write('receive ' + data + ' ' + user)
-                return file.read()
+            if data.endswith('.png') or data.endswith('.jpg') or data.endswith('.jpeg'):
+                img = open(homedir+data, 'rb')
+                b_img = img.read()
+                return b_img
+            else:
+                with open(homedir+data, 'r') as file:
+                    with open('/home/alisa/PycharmProjects/ftp/log.txt', 'w') as logs:
+                        logs.write('receive ' + data + ' ' + user)
+                    return file.read()
         except OSError as e:
             print(e)
             return 'error'
@@ -92,12 +97,16 @@ def user(conn, addr):
         request = conn.recv(1024).decode()
         print(request)
         response = process(request)
-        conn.send(response.encode())
+        try:
+            conn.send(response)
+        except Exception as e:
+            print(e)
+            conn.send(response.encode())
         if request.startswith('GET /stop/'):
             conn.close()
             break
 
-PORT = 8090
+PORT = 8096
 users = ['alisa']
 sock = socket.socket()
 sock.bind(('', PORT))
